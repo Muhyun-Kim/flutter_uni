@@ -29,13 +29,29 @@ class PixabeyPage extends StatefulWidget {
 }
 
 class _PixabeyPageState extends State<PixabeyPage> {
-  List hits = [];
+  List<PixabeyImg> pixabeyImges = [];
 
   Future<void> fetchImages(String serchWord) async {
-    Response response = await Dio().get(
+    final response = await Dio().get(
         "https://pixabay.com/api/?key=$fixabeyApiKey&q=$serchWord&image_type=photo&pretty=true");
-    hits = response.data["hits"];
+    final List hits = response.data["hits"];
+    pixabeyImges = hits.map(
+      (e) {
+        return PixabeyImg.fromMap(e);
+      },
+    ).toList();
     setState(() {});
+  }
+
+  Future<void> shareImg(String url) async {
+    final response = await Dio().get(
+      url,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final dir = await getTemporaryDirectory();
+    final file =
+        await File("${dir.path}/image.png").writeAsBytes(response.data);
+    Share.shareXFiles([XFile(file.path)]);
   }
 
   @override
@@ -63,27 +79,18 @@ class _PixabeyPageState extends State<PixabeyPage> {
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
         ),
-        itemCount: hits.length,
+        itemCount: pixabeyImges.length,
         itemBuilder: (context, index) {
-          Map<String, dynamic> hit = hits[index];
+          final pixabeyImg = pixabeyImges[index];
           return InkWell(
             onTap: () async {
-              Response response = await Dio().get(
-                hit["webformatURL"],
-                options: Options(
-                  responseType: ResponseType.bytes,
-                ),
-              );
-              Directory dir = await getTemporaryDirectory();
-              File file = await File("${dir.path}/image.png")
-                  .writeAsBytes(response.data);
-              Share.shareXFiles([XFile(file.path)]);
+              shareImg(pixabeyImg.webformatURL);
             },
             child: Stack(
               fit: StackFit.expand,
               children: [
                 Image.network(
-                  hit["previewURL"],
+                  pixabeyImg.previewURL,
                   fit: BoxFit.cover,
                 ),
                 Align(
@@ -97,7 +104,7 @@ class _PixabeyPageState extends State<PixabeyPage> {
                           Icons.thumb_up_alt_outlined,
                           size: 14,
                         ),
-                        Text("${hit["likes"]}"),
+                        Text("${pixabeyImg.likes}"),
                       ],
                     ),
                   ),
@@ -107,6 +114,26 @@ class _PixabeyPageState extends State<PixabeyPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class PixabeyImg {
+  final String webformatURL;
+  final String previewURL;
+  final int likes;
+
+  PixabeyImg({
+    required this.webformatURL,
+    required this.previewURL,
+    required this.likes,
+  });
+
+  factory PixabeyImg.fromMap(Map<String, dynamic> map) {
+    return PixabeyImg(
+      webformatURL: map["webformatURL"],
+      previewURL: map["previewURL"],
+      likes: map["likes"],
     );
   }
 }
